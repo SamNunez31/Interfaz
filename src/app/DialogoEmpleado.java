@@ -1,6 +1,6 @@
 package app;
 
-import ConexionBD.ConexionBD; // Asegúrate de que este import sea el correcto en tu proyecto
+import ConexionBD.ConexionBD;
 import com.toedter.calendar.JDateChooser;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -20,13 +20,14 @@ import java.util.regex.Pattern;
 public class DialogoEmpleado extends JDialog {
 
     private int idEmpleado;
+    
+    // Componentes de la interfaz
     private JTextField txtCedula, txtNom1, txtNom2, txtApe1, txtApe2, txtEmail, txtSueldo;
     private JComboBox<String> cmbSexo, cmbDpto, cmbRol;
     private JDateChooser dcFecha;
+    private JButton btnGuardar; 
     
-    // Bandera de éxito para que el padre sepa qué hacer al cerrar
     private boolean operacionExitosa = false;
-
     private List<Integer> listaIdsDpto = new ArrayList<>();
     private List<Integer> listaIdsRol = new ArrayList<>();
 
@@ -34,17 +35,20 @@ public class DialogoEmpleado extends JDialog {
     private final Color ACCENT_PURPLE = new Color(124, 77, 255);
     private final Color INPUT_BORDER_IDLE = new Color(80, 80, 90);
     private final Color CARD_BG = new Color(30, 25, 40, 240);
+    
+    // >>> COLORES DEFINITIVOS <<<
+    private final Color FIELD_BG = new Color(40, 35, 50); // Fondo Oscuro
+    private final Color TEXT_WHITE = Color.WHITE;         // Texto Blanco Puro
 
     public DialogoEmpleado(Frame padre, int id) {
-        super(padre, true); // Modal = true
+        super(padre, true);
         this.idEmpleado = id;
         
-        setTitle(id == 0 ? "Nuevo Empleado" : "Editar Empleado");
+        setTitle(id == 0 ? "Nuevo Empleado" : "Detalles del Empleado");
         setSize(950, 750);
         setLocationRelativeTo(padre);
         setResizable(false);
         
-        // Panel de Fondo con Gradiente
         JPanel background = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -59,10 +63,10 @@ public class DialogoEmpleado extends JDialog {
         setContentPane(background);
         
         iniciarUI(background);
-        cargarCombos(); // Cargar listas desplegables
+        cargarCombos();
         
         if (id > 0) {
-            cargarDatos(id); // Si es editar, cargamos datos
+            cargarDatos(id);
         }
     }
     
@@ -70,8 +74,77 @@ public class DialogoEmpleado extends JDialog {
         return operacionExitosa;
     }
 
+    // ========================================================================
+    // MODO LECTURA (EMPLEADOS INACTIVOS)
+    // ========================================================================
+    public void activarModoSoloLectura() {
+        // Bloqueamos campos de texto
+        estilarCampoBloqueado(txtCedula);
+        estilarCampoBloqueado(txtNom1);
+        estilarCampoBloqueado(txtNom2);
+        estilarCampoBloqueado(txtApe1);
+        estilarCampoBloqueado(txtApe2);
+        estilarCampoBloqueado(txtEmail);
+        estilarCampoBloqueado(txtSueldo);
+
+        // FECHA: Deshabilitamos el botón pero forzamos el color del texto
+        dcFecha.setEnabled(false); 
+        forzarEstiloFecha(); // <--- REFUERZO DE COLOR
+
+        // Combos
+        configurarComboLectura(cmbSexo);
+        configurarComboLectura(cmbDpto);
+        configurarComboLectura(cmbRol);
+
+        if (btnGuardar != null) btnGuardar.setVisible(false);
+    }
+
+    // Método auxiliar para bloquear campos y mantenerlos legibles
+    private void estilarCampoBloqueado(JTextField txt) {
+        txt.setEditable(false);
+        txt.setFocusable(false);
+        txt.setEnabled(true); // Habilitado para que el color blanco brille
+        
+        txt.setOpaque(true); 
+        txt.setBackground(FIELD_BG); 
+        txt.setForeground(TEXT_WHITE); 
+        txt.setDisabledTextColor(TEXT_WHITE);
+        
+        txt.setBorder(BorderFactory.createCompoundBorder(
+            new MatteBorder(0, 0, 1, 0, new Color(80,80,80)), 
+            new EmptyBorder(0, 5, 0, 5)
+        ));
+    }
+
+    // >>> MÉTODO CLAVE PARA ARREGLAR TU PROBLEMA <<<
+    private void forzarEstiloFecha() {
+        // Obtenemos el componente interno de texto del JDateChooser
+        JTextField dateEditor = ((JTextField)dcFecha.getDateEditor().getUiComponent());
+        
+        // Lo obligamos a ser opaco y tener los colores correctos
+        dateEditor.setOpaque(true);
+        dateEditor.setBackground(FIELD_BG);
+        dateEditor.setForeground(TEXT_WHITE);        // Texto normal blanco
+        dateEditor.setDisabledTextColor(TEXT_WHITE); // Texto deshabilitado blanco
+        dateEditor.setCaretColor(TEXT_WHITE);        // Cursor blanco
+        
+        // Borde inferior
+        dateEditor.setBorder(new MatteBorder(0,0,2,0, INPUT_BORDER_IDLE));
+        
+        // Repintamos por si acaso
+        dateEditor.repaint();
+    }
+
+    private void configurarComboLectura(JComboBox cmb) {
+        cmb.setEditable(true);
+        Component editorComp = cmb.getEditor().getEditorComponent();
+        if (editorComp instanceof JTextField) {
+            estilarCampoBloqueado((JTextField) editorComp);
+        }
+        cmb.setEnabled(false);
+    }
+
     private void iniciarUI(JPanel background) {
-        // Tarjeta Central
         JPanel card = new JPanel(new BorderLayout()) {
             protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
@@ -83,7 +156,7 @@ public class DialogoEmpleado extends JDialog {
         card.setOpaque(false);
         card.setBorder(new EmptyBorder(30, 50, 30, 50));
         
-        JLabel lblTitle = new JLabel(idEmpleado == 0 ? "NUEVO INGRESO" : "ACTUALIZAR DATOS");
+        JLabel lblTitle = new JLabel(idEmpleado == 0 ? "NUEVO INGRESO" : "INFORMACIÓN DEL EMPLEADO");
         lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 26));
         lblTitle.setForeground(Color.WHITE);
         lblTitle.setHorizontalAlignment(SwingConstants.CENTER);
@@ -101,7 +174,6 @@ public class DialogoEmpleado extends JDialog {
         addSectionTitle(formPanel, "Información Personal", 0, y++, gbc);
         
         txtCedula = addInput(formPanel, "Cédula / RUC", 0, y, gbc); y += 2;
-        // Validación solo números y longitud max 13
         txtCedula.addKeyListener(new KeyAdapter() { 
             public void keyTyped(KeyEvent evt) { 
                 if(!Character.isDigit(evt.getKeyChar())) evt.consume(); 
@@ -123,11 +195,10 @@ public class DialogoEmpleado extends JDialog {
         dcFecha.setDateFormatString("dd/MM/yyyy");
         dcFecha.setBackground(CARD_BG); 
         dcFecha.setPreferredSize(new Dimension(200, 35));
-        // Estilo oscuro para el JDateChooser
-        JTextField dateEditor = ((JTextField)dcFecha.getDateEditor().getUiComponent());
-        dateEditor.setBackground(new Color(40,35,50));
-        dateEditor.setForeground(Color.WHITE);
-        dateEditor.setBorder(new MatteBorder(0,0,2,0, INPUT_BORDER_IDLE));
+        
+        // APLICAMOS EL ESTILO INMEDIATAMENTE AL CREAR
+        forzarEstiloFecha();
+        
         formPanel.add(dcFecha, gbc); y++; 
 
         addLabel(formPanel, "Género", 1, y++, gbc);
@@ -138,20 +209,12 @@ public class DialogoEmpleado extends JDialog {
         
         txtSueldo = addInput(formPanel, "Sueldo Mensual ($)", 1, y, gbc); y += 2;
         
-        // >>> VALIDACIÓN CORRECTA DE SALARIO (UN SOLO PUNTO) <<<
         txtSueldo.addKeyListener(new KeyAdapter() {
             public void keyTyped(KeyEvent evt) {
                 char c = evt.getKeyChar();
                 String text = txtSueldo.getText();
-                // 1. Solo dígitos y punto
-                if (!Character.isDigit(c) && c != '.') {
-                    evt.consume();
-                    return;
-                }
-                // 2. Si es punto, verificar que no exista ya
-                if (c == '.' && text.contains(".")) {
-                    evt.consume();
-                }
+                if (!Character.isDigit(c) && c != '.') { evt.consume(); return; }
+                if (c == '.' && text.contains(".")) { evt.consume(); }
             }
         });
         
@@ -167,28 +230,27 @@ public class DialogoEmpleado extends JDialog {
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
         btnPanel.setOpaque(false);
         
-        JButton btnSave = new JButton("GUARDAR DATOS"); styleButtonPrimary(btnSave);
-        btnSave.addActionListener(e -> guardarDatos());
+        btnGuardar = new JButton("GUARDAR DATOS"); 
+        styleButtonPrimary(btnGuardar);
+        btnGuardar.addActionListener(e -> guardarDatos());
         
-        JButton btnCancel = new JButton("CANCELAR"); styleButtonSecondary(btnCancel);
+        JButton btnCancel = new JButton("CERRAR"); 
+        styleButtonSecondary(btnCancel);
         btnCancel.addActionListener(e -> dispose());
         
-        btnPanel.add(btnSave); btnPanel.add(btnCancel);
+        btnPanel.add(btnGuardar); 
+        btnPanel.add(btnCancel);
         
         card.add(btnPanel, BorderLayout.SOUTH);
         background.add(card);
     }
 
-    // ========================================================================
-    // CARGA DE DATOS (Con corrección de NULLs y Bloqueo)
-    // ========================================================================
     private void cargarDatos(int id) {
         try (Connection cn = ConexionBD.getConexion();
              PreparedStatement pst = cn.prepareStatement("SELECT * FROM Empleados WHERE id_Empleado_PK = ?")) {
             pst.setInt(1, id);
             ResultSet rs = pst.executeQuery();
             if (rs.next()) {
-                // Usamos validarNull para evitar que el campo se quede en blanco si la BD tiene null
                 txtCedula.setText(validarNull(rs.getString("emp_ciruc")));
                 txtNom1.setText(validarNull(rs.getString("emp_Nombre1")));
                 txtNom2.setText(validarNull(rs.getString("emp_Nombre2"))); 
@@ -206,19 +268,19 @@ public class DialogoEmpleado extends JDialog {
                     dcFecha.setDate(rs.getDate("emp_FechaNacimiento"));
                 }
                 
-                // Selección de combos
                 int idDep = rs.getInt("id_Departamento");
                 if(listaIdsDpto.contains(idDep)) cmbDpto.setSelectedIndex(listaIdsDpto.indexOf(idDep));
                 
                 int idRol = rs.getInt("id_Rol");
                 if(listaIdsRol.contains(idRol)) cmbRol.setSelectedIndex(listaIdsRol.indexOf(idRol));
                 
-                // >>> BLOQUEAR CAMPOS INMUTABLES <<<
+                // MODO ACTUALIZAR (Normal):
+                // Bloqueamos la Cédula (Llave Primaria) visualmente
                 txtCedula.setEditable(false);
                 txtCedula.setForeground(Color.GRAY);
                 
-                dcFecha.setEnabled(false); 
-                ((JTextField)dcFecha.getDateEditor().getUiComponent()).setDisabledTextColor(Color.GRAY);
+                // Aseguramos que la fecha se vea BLANCA al cargar los datos
+                forzarEstiloFecha();
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -251,7 +313,6 @@ public class DialogoEmpleado extends JDialog {
             int idRol = listaIdsRol.get(cmbRol.getSelectedIndex());
 
             if (idEmpleado == 0) {
-                // INSERT
                 sql = "INSERT INTO Empleados (emp_ciruc, emp_Nombre1, emp_Nombre2, emp_Apellido1, emp_Apellido2, emp_Sexo, emp_FechaNacimiento, emp_Mail, emp_Sueldo, id_Departamento, id_Rol, emp_Estado) VALUES (?,?,?,?,?,?,?,?,?,?,?, 'ACT')";
                 pst = cn.prepareStatement(sql);
                 pst.setString(1, txtCedula.getText().trim());
@@ -265,7 +326,6 @@ public class DialogoEmpleado extends JDialog {
                 pst.setDouble(9, sueldo);
                 pst.setInt(10, idDpto); pst.setInt(11, idRol);
             } else {
-                // UPDATE (Sin tocar Cédula ni Fecha)
                 sql = "UPDATE Empleados SET emp_Nombre1=?, emp_Nombre2=?, emp_Apellido1=?, emp_Apellido2=?, emp_Sexo=?, emp_Mail=?, emp_Sueldo=?, id_Departamento=?, id_Rol=? WHERE id_Empleado_PK=?";
                 pst = cn.prepareStatement(sql);
                 pst.setString(1, txtNom1.getText().trim().toUpperCase());
@@ -282,7 +342,7 @@ public class DialogoEmpleado extends JDialog {
             pst.executeUpdate();
             
             this.operacionExitosa = true; 
-            dispose(); // Cerramos para que el padre muestre el mensaje de éxito
+            dispose(); 
             
         } catch (Exception e) {
             e.printStackTrace();
@@ -290,16 +350,11 @@ public class DialogoEmpleado extends JDialog {
         }
     }
 
-    // ========================================================================
-    // VALIDACIONES COMPLETAS
-    // ========================================================================
-
     private boolean validarTodo() {
         if (txtCedula.getText().trim().isEmpty() || txtNom1.getText().trim().isEmpty() || txtApe1.getText().trim().isEmpty()) {
             mostrarToast("Campos incompletos: Cédula, Nombres y Apellidos.", true); return false;
         }
         
-        // Solo validar Cédula si es nuevo registro (si edita, ya es confiable)
         if (idEmpleado == 0) {
             String cedula = txtCedula.getText().trim();
             if(cedula.length() == 13 && !cedula.endsWith("001")) { mostrarToast("El RUC debe terminar en 001.", true); return false; }
@@ -313,7 +368,6 @@ public class DialogoEmpleado extends JDialog {
 
         if (!txtEmail.getText().isEmpty() && !validarEmail(txtEmail.getText())) { mostrarToast("Correo inválido (ej: usuario@dominio.com).", true); return false; }
         
-        // Validar fecha solo si es nuevo
         if (idEmpleado == 0) {
             if (dcFecha.getDate() == null) { mostrarToast("Ingrese fecha nacimiento.", true); return false; }
             if (!validarEdad(dcFecha.getDate())) return false;
@@ -341,9 +395,7 @@ public class DialogoEmpleado extends JDialog {
         } catch (Exception e) { return false; }
     }
 
-    // >>> VALIDACIÓN EMAIL MEJORADA <<<
     private boolean validarEmail(String e) {
-        // Regex estricta: usuario@dominio.extensión (al menos 2 letras)
         String regex = "^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$";
         return Pattern.compile(regex).matcher(e).matches();
     }
@@ -366,10 +418,6 @@ public class DialogoEmpleado extends JDialog {
         } catch (Exception e) {} return true;
     }
 
-    // =========================================================================
-    // VISUALES (TOAST + ESTILOS)
-    // =========================================================================
-    
     private void mostrarToast(String mensaje, boolean esError) {
         JWindow toast = new JWindow(this);
         toast.setBackground(new Color(0,0,0,0));

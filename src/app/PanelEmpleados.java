@@ -22,6 +22,7 @@ public class PanelEmpleados extends JPanel {
     private JTable tabla;
     private DefaultTableModel modelo;
     private JTextField txtBuscar;
+    private JCheckBox chkVerTodos; // <--- AGREGAR ESTO
 
     // Colores del Tema
     private final Color COLOR_VERDE = new Color(46, 204, 113);
@@ -115,36 +116,57 @@ public class PanelEmpleados extends JPanel {
         return panel;
     }
 
-    private JPanel crearPanelTabla() {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setOpaque(false);
-        panel.setBorder(BorderFactory.createEmptyBorder(10, 20, 20, 20));
+ private JPanel crearPanelTabla() {
+    JPanel panel = new JPanel(new BorderLayout());
+    panel.setOpaque(false);
+    // Reduje el padding inferior de 20 a 5 para que el checkbox quede más pegadito
+    panel.setBorder(BorderFactory.createEmptyBorder(10, 20, 5, 20));
 
-        modelo = new DefaultTableModel(
-            new Object[]{"ID", "Cédula", "Apellidos", "Nombres", "Departamento", "Rol", "Sueldo ($)", "Estado"}, 0
-        ) {
-            @Override
-            public boolean isCellEditable(int row, int column) { return false; }
-        };
+    modelo = new DefaultTableModel(
+        new Object[]{"ID", "Cédula", "Apellidos", "Nombres", "Departamento", "Rol", "Sueldo ($)", "Estado"}, 0
+    ) {
+        @Override
+        public boolean isCellEditable(int row, int column) { return false; }
+    };
 
-        tabla = new JTable(modelo);
-        configurarTabla(); 
+    tabla = new JTable(modelo);
+    configurarTabla();
 
-        tabla.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) {
-                    editarEmpleadoSeleccionado(); 
-                }
+    tabla.addMouseListener(new MouseAdapter() {
+        public void mouseClicked(MouseEvent e) {
+            if (e.getClickCount() == 2) {
+                editarEmpleadoSeleccionado();
             }
-        });
+        }
+    });
 
-        JScrollPane scroll = new JScrollPane(tabla);
-        scroll.setBorder(BorderFactory.createEmptyBorder()); 
-        scroll.getViewport().setBackground(Color.WHITE); 
-        
-        panel.add(scroll, BorderLayout.CENTER);
-        return panel;
-    }
+    JScrollPane scroll = new JScrollPane(tabla);
+    scroll.setBorder(BorderFactory.createEmptyBorder());
+    scroll.getViewport().setBackground(Color.WHITE);
+    // Opcional: Forzar una altura preferida si quieres que sea más pequeña visualmente
+    scroll.setPreferredSize(new Dimension(scroll.getPreferredSize().width, 350));
+
+    panel.add(scroll, BorderLayout.CENTER);
+
+    // --- NUEVO: PANEL INFERIOR (FOOTER) CON EL CHECKBOX ---
+    JPanel panelFooter = new JPanel(new FlowLayout(FlowLayout.LEFT));
+    panelFooter.setOpaque(false);
+    panelFooter.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
+
+    chkVerTodos = new JCheckBox("Ver todos");
+    chkVerTodos.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+    chkVerTodos.setForeground(Color.WHITE); // Texto blanco para contraste
+    chkVerTodos.setOpaque(false);
+    chkVerTodos.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+    // ACCIÓN: Al dar click, recargamos la tabla con el filtro actual del buscador
+    chkVerTodos.addActionListener(e -> cargarEmpleados(txtBuscar.getText().trim()));
+
+    panelFooter.add(chkVerTodos);
+    panel.add(panelFooter, BorderLayout.SOUTH); // Lo ponemos al sur para que salga debajo de la tabla
+
+    return panel;
+}
 
     private void configurarTabla() {
         tabla.setRowHeight(40); 
@@ -235,73 +257,115 @@ public class PanelEmpleados extends JPanel {
         tabla.setSelectionForeground(Color.WHITE);
     }
 
-    private void cargarEmpleados(String filtro) {
-        modelo.setRowCount(0);
-        
-        String sql = "SELECT e.id_Empleado_PK, e.emp_ciruc, e.emp_Apellido1, e.emp_Nombre1, " +
-                     "d.dep_Nombre, r.rol_Descripcion, e.emp_Sueldo, e.emp_Estado, " +
-                     "e.emp_Apellido2, e.emp_Nombre2 " + 
-                     "FROM Empleados e " +
-                     "JOIN Departamentos d ON e.id_Departamento = d.id_Departamento_PK " +
-                     "JOIN Roles r ON e.id_Rol = r.id_Rol_PK " + 
-                     "WHERE e.emp_Estado = 'ACT' "; 
+ private void cargarEmpleados(String filtro) {
+    modelo.setRowCount(0);
 
-        if (!filtro.isEmpty()) {
-            sql += " AND (e.emp_ciruc LIKE ? OR e.emp_Apellido1 LIKE ? OR e.emp_Nombre1 LIKE ?) ";
-        }
-        
-        sql += " ORDER BY e.emp_Apellido1 ASC";
+    // 1. Base de la consulta
+    String sql = "SELECT e.id_Empleado_PK, e.emp_ciruc, e.emp_Apellido1, e.emp_Nombre1, " +
+                 "d.dep_Nombre, r.rol_Descripcion, e.emp_Sueldo, e.emp_Estado, " +
+                 "e.emp_Apellido2, e.emp_Nombre2 " +
+                 "FROM Empleados e " +
+                 "JOIN Departamentos d ON e.id_Departamento = d.id_Departamento_PK " +
+                 "JOIN Roles r ON e.id_Rol = r.id_Rol_PK " +
+                 "WHERE 1=1 "; // Usamos 1=1 para concatenar condiciones fácilmente
 
-        try (Connection cn = ConexionBD.getConexion();
-             PreparedStatement pst = cn.prepareStatement(sql)) {
-
-            if (!filtro.isEmpty()) {
-                String f = "%" + filtro + "%";
-                pst.setString(1, f); pst.setString(2, f); pst.setString(3, f);
-            }
-
-            ResultSet rs = pst.executeQuery();
-            DecimalFormat df = new DecimalFormat("#,##0.00");
-            
-            while (rs.next()) {
-                // >>> TRIM PARA EVITAR ESPACIOS EXCESIVOS <<<
-                String apellidos = "";
-                if (rs.getString("emp_Apellido1") != null) apellidos += rs.getString("emp_Apellido1").trim();
-                if (rs.getString("emp_Apellido2") != null && !rs.getString("emp_Apellido2").trim().isEmpty()) {
-                    apellidos += " " + rs.getString("emp_Apellido2").trim();
-                }
-                
-                String nombres = "";
-                if (rs.getString("emp_Nombre1") != null) nombres += rs.getString("emp_Nombre1").trim();
-                if (rs.getString("emp_Nombre2") != null && !rs.getString("emp_Nombre2").trim().isEmpty()) {
-                    nombres += " " + rs.getString("emp_Nombre2").trim();
-                }
-
-                modelo.addRow(new Object[]{
-                    rs.getInt("id_Empleado_PK"), 
-                    rs.getString("emp_ciruc"), 
-                    apellidos, 
-                    nombres,   
-                    rs.getString("dep_Nombre"), 
-                    rs.getString("rol_Descripcion"), 
-                    df.format(rs.getDouble("emp_Sueldo")), 
-                    rs.getString("emp_Estado")             
-                });
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-            Notifications.getInstance().show(Notifications.Type.ERROR, Notifications.Location.TOP_RIGHT, "Error al cargar datos");
-        }
+    // 2. Lógica del CheckBox: Si NO está seleccionado, filtra solo activos
+    // (Si está seleccionado, no agrega nada, por lo tanto trae todo)
+    if (chkVerTodos != null && !chkVerTodos.isSelected()) {
+        sql += " AND e.emp_Estado = 'ACT' ";
     }
 
-    private void editarEmpleadoSeleccionado() {
+    // 3. Filtro del buscador
+    if (!filtro.isEmpty()) {
+        sql += " AND (e.emp_ciruc LIKE ? OR e.emp_Apellido1 LIKE ? OR e.emp_Nombre1 LIKE ?) ";
+    }
+
+    sql += " ORDER BY e.emp_Apellido1 ASC";
+
+    try (Connection cn = ConexionBD.getConexion();
+         PreparedStatement pst = cn.prepareStatement(sql)) {
+
+        if (!filtro.isEmpty()) {
+            String f = "%" + filtro + "%";
+            pst.setString(1, f);
+            pst.setString(2, f);
+            pst.setString(3, f);
+        }
+
+        ResultSet rs = pst.executeQuery();
+        DecimalFormat df = new DecimalFormat("#,##0.00");
+
+        while (rs.next()) {
+            // Construcción de Nombres y Apellidos
+            String apellidos = "";
+            if (rs.getString("emp_Apellido1") != null) apellidos += rs.getString("emp_Apellido1").trim();
+            if (rs.getString("emp_Apellido2") != null && !rs.getString("emp_Apellido2").trim().isEmpty()) {
+                apellidos += " " + rs.getString("emp_Apellido2").trim();
+            }
+
+            String nombres = "";
+            if (rs.getString("emp_Nombre1") != null) nombres += rs.getString("emp_Nombre1").trim();
+            if (rs.getString("emp_Nombre2") != null && !rs.getString("emp_Nombre2").trim().isEmpty()) {
+                nombres += " " + rs.getString("emp_Nombre2").trim();
+            }
+
+            // NOTA: Tu renderizador de la columna 7 (Estado) ya tiene la lógica:
+            // if ("ACT".equals(value)) -> Verde
+            // else -> Rojo e "INACTIVO"
+            // Por lo tanto, al llegar un estado 'INA', se pintará rojo automáticamente.
+
+            modelo.addRow(new Object[]{
+                rs.getInt("id_Empleado_PK"),
+                rs.getString("emp_ciruc"),
+                apellidos,
+                nombres,
+                rs.getString("dep_Nombre"),
+                rs.getString("rol_Descripcion"),
+                df.format(rs.getDouble("emp_Sueldo")),
+                rs.getString("emp_Estado") // Pasamos el estado crudo (ACT/INA)
+            });
+        }
+    } catch (Exception e) {
+        e.printStackTrace();
+        Notifications.getInstance().show(Notifications.Type.ERROR, Notifications.Location.TOP_RIGHT, "Error al cargar datos");
+    }
+}
+
+private void editarEmpleadoSeleccionado() {
         int fila = tabla.getSelectedRow();
         if (fila == -1) {
-            Notifications.getInstance().show(Notifications.Type.WARNING, Notifications.Location.TOP_RIGHT, "Seleccione un empleado para editar");
+            Notifications.getInstance().show(Notifications.Type.WARNING, Notifications.Location.TOP_RIGHT, "Seleccione un empleado para ver");
             return;
         }
+
+        // 1. Obtener ID y Estado
         int id = Integer.parseInt(tabla.getValueAt(fila, 0).toString());
-        abrirFormulario(id);
+        Object valorEstado = tabla.getValueAt(fila, 7); // Columna 7 es el estado
+        String estado = (valorEstado != null) ? valorEstado.toString() : "";
+        
+        // 2. Crear el diálogo (pero NO mostrarlo todavía con setVisible)
+        Window ventanaPadre = SwingUtilities.getWindowAncestor(this);
+        DialogoEmpleado dialogo = new DialogoEmpleado((Frame) ventanaPadre, id);
+
+        // 3. Verificar si es inactivo
+        // Aceptamos "INA" (dato crudo) o "INACTIVO" (por si acaso cambias el renderer)
+        if ("INA".equals(estado) || estado.contains("INACTIVO")) {
+            
+            // Avisamos sutilmente al usuario
+            Notifications.getInstance().show(Notifications.Type.INFO, Notifications.Location.TOP_RIGHT, "Modo Lectura: Empleado Inactivo");
+            
+            // >>> AQUÍ LLAMAMOS AL MÉTODO QUE BLOQUEA LA EDICIÓN <<<
+            // (Debes crear este método en tu clase DialogoEmpleado, ver abajo)
+            dialogo.activarModoSoloLectura(); 
+        }
+
+        // 4. Mostrar el diálogo
+        dialogo.setVisible(true); 
+        
+        // 5. Recargar tabla solo si hubo cambios (si estaba en modo lectura, esto no pasará, pero no estorba)
+        if (dialogo.isOperacionExitosa()) {
+            cargarEmpleados(""); 
+        }
     }
 
     private void eliminarEmpleado() {
