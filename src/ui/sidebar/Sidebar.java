@@ -172,9 +172,12 @@ public class Sidebar extends JPanel {
         Icon iconInv     = IconUtil.load("/icono/iconinventario.png", 18);
         Icon iconConta   = IconUtil.load("/icono/iconcontabilidad.jpg", 18);
 
+        // --- TALENTO HUMANO ---
         AccordionMenu tthh = new AccordionMenu("Talento Humano", iconTTHH);
         tthh.addItem("Empleados", e -> fireEvent("EMPLEADOS"));
         tthh.addItem("Roles de Pago", e -> fireEvent("ROLES"));
+        // >>> NUEVA OPCIÓN AGREGADA AQUÍ <<<
+        tthh.addItem("Asientos Contables", e -> fireEvent("ASIENTOS_CONTABLES")); 
         menus.add(tthh);
 
         AccordionMenu ventas = new AccordionMenu("Ventas", iconVentas);
