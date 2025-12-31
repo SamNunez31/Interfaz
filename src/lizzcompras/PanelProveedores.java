@@ -1,0 +1,466 @@
+package app;
+
+import ConexionBD.ConexionBD;
+import raven.toast.Notifications;
+import shared.ui.IconUtil; 
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.JTableHeader;
+import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.geom.RoundRectangle2D;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+
+public class PanelProveedores extends JPanel {
+
+    private JTable tabla;
+    private DefaultTableModel modelo;
+    private JTextField txtBuscar;
+    private JCheckBox chkVerTodos; 
+
+    // Colores del Tema (Idénticos a Empleados)
+    private final Color COLOR_VERDE = new Color(46, 204, 113);
+    private final Color COLOR_ROJO = new Color(231, 76, 60);
+    private final Color COLOR_AZUL = new Color(52, 152, 219);
+    private final Color TEXTO_BLANCO = new Color(240, 240, 240);
+    private final Color FONDO_OSCURO = new Color(20, 20, 24); 
+    
+    // Colores para la tabla blanca
+    private final Color TABLA_FONDO = Color.WHITE;
+    private final Color TABLA_TEXTO = new Color(50, 50, 50);
+    private final Color TABLA_GRID = new Color(230, 230, 230);
+
+    public PanelProveedores() {
+        setLayout(new BorderLayout());
+        setBackground(FONDO_OSCURO); 
+
+        add(crearPanelSuperior(), BorderLayout.NORTH);
+        add(crearPanelTabla(), BorderLayout.CENTER);
+        
+        cargarProveedores("");
+    }
+
+    private JPanel crearPanelSuperior() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setOpaque(false);
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 10, 20));
+
+        JLabel titulo = new JLabel("Lista de Proveedores");
+        titulo.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        titulo.setForeground(TEXTO_BLANCO);
+        
+        JPanel toolbar = new JPanel();
+        toolbar.setLayout(new BoxLayout(toolbar, BoxLayout.X_AXIS)); 
+        toolbar.setOpaque(false);
+
+        // BOTÓN NUEVO (Icono 20px)
+        JButton btnNuevo = crearBoton("Nuevo Proveedor", COLOR_VERDE, "/icono/agregar.png", 20);
+        btnNuevo.addActionListener(e -> abrirFormulario(0));
+
+        // BOTÓN ELIMINAR (Icono 16px - Pequeño)
+        JButton btnEliminar = crearBoton("Eliminar Proveedor", COLOR_ROJO, "/icono/borrar.png", 16);
+        btnEliminar.addActionListener(e -> eliminarProveedor());
+        
+        // >>> BOTÓN ACTUALIZAR (Icono 26px - Grande) <<<
+        JButton btnEditar = crearBoton("Actualizar Proveedor", new Color(100, 100, 100), "/icono/editar.png", 26);
+        btnEditar.setPreferredSize(new Dimension(200, 35)); 
+        btnEditar.setMaximumSize(new Dimension(200, 35));
+        btnEditar.addActionListener(e -> editarProveedorSeleccionado()); 
+
+        // --- BUSCADOR ---
+        JPanel panelBuscador = new JPanel(new BorderLayout());
+        panelBuscador.setOpaque(false);
+        panelBuscador.setBorder(BorderFactory.createLineBorder(new Color(60, 60, 65), 1)); 
+        panelBuscador.setMaximumSize(new Dimension(300, 35)); 
+        panelBuscador.setPreferredSize(new Dimension(250, 35));
+
+        txtBuscar = new JTextField(15);
+        txtBuscar.putClientProperty("JTextField.placeholderText", "Buscar RUC o Nombre...");
+        txtBuscar.putClientProperty("JTextField.showClearButton", true);
+        txtBuscar.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 5));
+        
+        Icon iconoBuscar = IconUtil.load("/icono/buscar.png", 20); 
+        JButton btnBuscar = new JButton();
+        if (iconoBuscar != null) btnBuscar.setIcon(iconoBuscar);
+        else btnBuscar.setText("🔍");
+
+        btnBuscar.setBackground(COLOR_AZUL);
+        btnBuscar.setBorderPainted(false);
+        btnBuscar.setFocusPainted(false);
+        btnBuscar.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btnBuscar.setPreferredSize(new Dimension(40, 35)); 
+        btnBuscar.addActionListener(e -> cargarProveedores(txtBuscar.getText().trim()));
+
+        panelBuscador.add(txtBuscar, BorderLayout.CENTER);
+        panelBuscador.add(btnBuscar, BorderLayout.EAST);
+
+        toolbar.add(btnNuevo);
+        toolbar.add(Box.createHorizontalStrut(10)); 
+        toolbar.add(btnEliminar);
+        toolbar.add(Box.createHorizontalStrut(10)); 
+        toolbar.add(btnEditar);
+        
+        toolbar.add(Box.createHorizontalGlue()); 
+        toolbar.add(panelBuscador);
+
+        panel.add(titulo, BorderLayout.NORTH);
+        panel.add(Box.createVerticalStrut(15), BorderLayout.CENTER);
+        panel.add(toolbar, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private JPanel crearPanelTabla() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setOpaque(false);
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 20, 5, 20));
+
+        // Adaptamos las columnas a PROVEEDORES
+        modelo = new DefaultTableModel(
+            new Object[]{"ID", "RUC/Cédula", "Razón Social", "Teléfono", "Correo", "Ciudad", "Dirección", "Estado"}, 0
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
+
+        tabla = new JTable(modelo);
+        configurarTabla();
+
+        tabla.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    editarProveedorSeleccionado();
+                }
+            }
+        });
+
+        JScrollPane scroll = new JScrollPane(tabla);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.getViewport().setBackground(Color.WHITE);
+        scroll.setPreferredSize(new Dimension(scroll.getPreferredSize().width, 350));
+
+        panel.add(scroll, BorderLayout.CENTER);
+
+        // --- PANEL INFERIOR (FOOTER) CON EL CHECKBOX ---
+        JPanel panelFooter = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panelFooter.setOpaque(false);
+        panelFooter.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
+
+        chkVerTodos = new JCheckBox("Ver todos");
+        chkVerTodos.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        chkVerTodos.setForeground(Color.WHITE); 
+        chkVerTodos.setOpaque(false);
+        chkVerTodos.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        // Acción de recarga
+        chkVerTodos.addActionListener(e -> cargarProveedores(txtBuscar.getText().trim()));
+
+        panelFooter.add(chkVerTodos);
+        panel.add(panelFooter, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private void configurarTabla() {
+        tabla.setRowHeight(40); 
+        tabla.setIntercellSpacing(new Dimension(0, 0)); 
+        tabla.setShowVerticalLines(false); 
+        tabla.setShowHorizontalLines(true);
+        
+        tabla.setBackground(TABLA_FONDO); 
+        tabla.setForeground(TABLA_TEXTO); 
+        tabla.setGridColor(TABLA_GRID);    
+        
+        tabla.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+
+        JTableHeader header = tabla.getTableHeader();
+        header.setReorderingAllowed(false);
+        header.setPreferredSize(new Dimension(0, 45)); 
+        
+        header.setDefaultRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                setBackground(TABLA_FONDO); 
+                setForeground(TABLA_TEXTO);
+                setFont(new Font("Segoe UI", Font.BOLD, 14));
+                setHorizontalAlignment(JLabel.CENTER);
+                setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(200,200,200)));
+                return this;
+            }
+        });
+
+        // Configuración de anchos de columna para Proveedores
+        tabla.getColumnModel().getColumn(0).setPreferredWidth(40);  // ID
+        tabla.getColumnModel().getColumn(0).setMaxWidth(60);
+        
+        tabla.getColumnModel().getColumn(1).setPreferredWidth(120); // RUC
+        tabla.getColumnModel().getColumn(1).setMinWidth(100);
+        
+        tabla.getColumnModel().getColumn(2).setPreferredWidth(200); // Razón Social (Ancho)
+        tabla.getColumnModel().getColumn(2).setMinWidth(150);
+        
+        tabla.getColumnModel().getColumn(3).setPreferredWidth(90);  // Teléfono
+        tabla.getColumnModel().getColumn(3).setMinWidth(80);
+        
+        tabla.getColumnModel().getColumn(4).setPreferredWidth(150); // Correo
+        tabla.getColumnModel().getColumn(4).setMinWidth(120);
+
+        tabla.getColumnModel().getColumn(5).setPreferredWidth(100); // Ciudad
+        tabla.getColumnModel().getColumn(5).setMinWidth(80);
+
+        tabla.getColumnModel().getColumn(6).setPreferredWidth(150); // Dirección
+        tabla.getColumnModel().getColumn(6).setMinWidth(100);
+        
+        tabla.getColumnModel().getColumn(7).setPreferredWidth(90);  // Estado
+        tabla.getColumnModel().getColumn(7).setMaxWidth(110);
+
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
+        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        tabla.getColumnModel().getColumn(0).setCellRenderer(centerRenderer); 
+        tabla.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
+        tabla.getColumnModel().getColumn(3).setCellRenderer(centerRenderer); // Teléfono centrado
+
+        // Renderer para el ESTADO (Columna 7)
+        tabla.getColumnModel().getColumn(7).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                JLabel l = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                l.setFont(new Font("Segoe UI", Font.BOLD, 12));
+                l.setHorizontalAlignment(JLabel.CENTER);
+                
+                if ("ACT".equals(value)) {
+                    l.setForeground(new Color(39, 174, 96)); 
+                    l.setText("● ACTIVO");
+                } else {
+                    l.setForeground(COLOR_ROJO);
+                    l.setText("● INACTIVO");
+                }
+                
+                if (isSelected) {
+                    l.setForeground(Color.WHITE); 
+                    l.setBackground(new Color(124, 77, 255)); 
+                } else {
+                    l.setBackground(Color.WHITE);
+                }
+                return l;
+            }
+        });
+        
+        tabla.setSelectionBackground(new Color(124, 77, 255)); 
+        tabla.setSelectionForeground(Color.WHITE);
+    }
+
+    private void cargarProveedores(String filtro) {
+        modelo.setRowCount(0);
+
+        // 1. Base de la consulta para PROVEEDORES
+        String sql = "SELECT p.id_Proveedor, p.prv_RUC_CED, p.prv_Nombre, p.prv_Telefono, " +
+                     "p.prv_Mail, c.ciu_descripcion, p.prv_Direccion, p.ESTADO_PRV " +
+                     "FROM PROVEEDORES p " +
+                     "JOIN CIUDADES c ON p.id_Ciudad = c.id_Ciudad_PK " +
+                     "WHERE 1=1 "; 
+
+        // 2. Lógica del CheckBox
+        if (chkVerTodos != null && !chkVerTodos.isSelected()) {
+            sql += " AND p.ESTADO_PRV = 'ACT' ";
+        }
+
+        // 3. Filtro del buscador
+        if (!filtro.isEmpty()) {
+            sql += " AND (p.prv_RUC_CED LIKE ? OR p.prv_Nombre LIKE ?) ";
+        }
+
+        sql += " ORDER BY p.prv_Nombre ASC";
+
+        try (Connection cn = ConexionBD.getConexion();
+             PreparedStatement pst = cn.prepareStatement(sql)) {
+
+            if (!filtro.isEmpty()) {
+                String f = "%" + filtro + "%";
+                pst.setString(1, f);
+                pst.setString(2, f);
+            }
+
+            ResultSet rs = pst.executeQuery();
+
+            while (rs.next()) {
+                modelo.addRow(new Object[]{
+                    rs.getInt("id_Proveedor"),
+                    rs.getString("prv_RUC_CED"),
+                    rs.getString("prv_Nombre"),
+                    rs.getString("prv_Telefono"),
+                    rs.getString("prv_Mail"),
+                    rs.getString("ciu_descripcion"), // Ciudad
+                    rs.getString("prv_Direccion"),
+                    rs.getString("ESTADO_PRV") // Estado crudo para el renderer
+                });
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Notifications.getInstance().show(Notifications.Type.ERROR, Notifications.Location.TOP_RIGHT, "Error al cargar proveedores");
+        }
+    }
+
+    private void editarProveedorSeleccionado() {
+        int fila = tabla.getSelectedRow();
+        if (fila == -1) {
+            Notifications.getInstance().show(Notifications.Type.WARNING, Notifications.Location.TOP_RIGHT, "Seleccione un proveedor para ver");
+            return;
+        }
+
+        // 1. Obtener ID y Estado
+        int id = Integer.parseInt(tabla.getValueAt(fila, 0).toString());
+        Object valorEstado = tabla.getValueAt(fila, 7); // Columna 7 es el estado
+        String estado = (valorEstado != null) ? valorEstado.toString() : "";
+        
+        // 2. Crear el diálogo
+        Window ventanaPadre = SwingUtilities.getWindowAncestor(this);
+        // ASUMIENDO QUE TIENES UNA CLASE DialogoProveedor
+        DialogoProveedor dialogo = new DialogoProveedor((Frame) ventanaPadre, id);
+
+        // 3. Verificar si es inactivo
+        if ("INA".equals(estado) || estado.contains("INACTIVO")) {
+            Notifications.getInstance().show(Notifications.Type.INFO, Notifications.Location.TOP_RIGHT, "Modo Lectura: Proveedor Inactivo");
+            dialogo.activarModoSoloLectura(); 
+        }
+
+        // 4. Mostrar el diálogo
+        dialogo.setVisible(true); 
+        
+        // 5. Recargar tabla
+        if (dialogo.isOperacionExitosa()) {
+            cargarProveedores(""); 
+        }
+    }
+
+    private void eliminarProveedor() {
+        int fila = tabla.getSelectedRow();
+        if (fila == -1) {
+            Notifications.getInstance().show(Notifications.Type.WARNING, Notifications.Location.TOP_RIGHT, "Seleccione un proveedor");
+            return;
+        }
+
+        int id = Integer.parseInt(tabla.getValueAt(fila, 0).toString());
+        String nombre = tabla.getValueAt(fila, 2).toString(); // Columna 2 es Razón Social
+
+        if (mostrarConfirmacionEliminar(nombre)) {
+            try (Connection cn = ConexionBD.getConexion();
+                 PreparedStatement pst = cn.prepareStatement("UPDATE PROVEEDORES SET ESTADO_PRV = 'INA' WHERE id_Proveedor = ?")) {
+                pst.setInt(1, id);
+                if (pst.executeUpdate() > 0) {
+                    Notifications.getInstance().show(Notifications.Type.SUCCESS, Notifications.Location.TOP_RIGHT, "Proveedor eliminado");
+                    cargarProveedores("");
+                }
+            } catch (Exception e) {
+                Notifications.getInstance().show(Notifications.Type.ERROR, Notifications.Location.TOP_RIGHT, "Error al eliminar");
+            }
+        }
+    }
+
+    private boolean mostrarConfirmacionEliminar(String nombreProveedor) {
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), true);
+        dialog.setUndecorated(true);
+        dialog.setBackground(new Color(0,0,0,0));
+        
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(40, 40, 45)); 
+                g2.fill(new RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 20, 20));
+                g2.setColor(new Color(231, 76, 60)); 
+                g2.setStroke(new BasicStroke(2));
+                g2.draw(new RoundRectangle2D.Double(1, 1, getWidth()-2, getHeight()-2, 20, 20));
+            }
+        };
+        panel.setLayout(new BorderLayout(20, 20));
+        panel.setBorder(new EmptyBorder(20, 30, 20, 30));
+        
+        JLabel lblTitulo = new JLabel("Eliminar Proveedor");
+        lblTitulo.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        lblTitulo.setForeground(new Color(231, 76, 60)); 
+        lblTitulo.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        JLabel lblMsg = new JLabel("<html><center>¿Estás seguro de eliminar a:<br><b>" + nombreProveedor + "</b>?</center></html>");
+        lblMsg.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        lblMsg.setForeground(Color.WHITE); 
+        lblMsg.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 0));
+        btnPanel.setOpaque(false);
+        
+        JButton btnSi = new JButton("SÍ, ELIMINAR");
+        btnSi.setBackground(new Color(231, 76, 60)); 
+        btnSi.setForeground(Color.WHITE);
+        btnSi.setFocusPainted(false);
+        btnSi.setBorderPainted(false);
+        btnSi.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btnSi.setPreferredSize(new Dimension(120, 35));
+        
+        JButton btnNo = new JButton("CANCELAR");
+        btnNo.setBackground(new Color(80, 80, 80)); 
+        btnNo.setForeground(Color.WHITE);
+        btnNo.setFocusPainted(false);
+        btnNo.setBorderPainted(false);
+        btnNo.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btnNo.setPreferredSize(new Dimension(120, 35));
+        
+        final boolean[] respuesta = {false};
+        
+        btnSi.addActionListener(e -> { respuesta[0] = true; dialog.dispose(); });
+        btnNo.addActionListener(e -> { respuesta[0] = false; dialog.dispose(); });
+        
+        btnPanel.add(btnNo);
+        btnPanel.add(btnSi);
+        
+        panel.add(lblTitulo, BorderLayout.NORTH);
+        panel.add(lblMsg, BorderLayout.CENTER);
+        panel.add(btnPanel, BorderLayout.SOUTH);
+        
+        dialog.add(panel);
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
+        
+        return respuesta[0];
+    }
+
+    private void abrirFormulario(int id) {
+        Window ventanaPadre = SwingUtilities.getWindowAncestor(this);
+        // ASUMIENDO QUE TIENES UNA CLASE DialogoProveedor
+        DialogoProveedor dialogo = new DialogoProveedor((Frame) ventanaPadre, id);
+        dialogo.setVisible(true); 
+        
+        if (dialogo.isOperacionExitosa()) {
+            cargarProveedores(""); 
+        }
+    }
+
+    private JButton crearBoton(String texto, Color bg, String rutaIcono, int iconSize) {
+        JButton btn = new JButton(texto);
+        btn.setBackground(bg);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        btn.setPreferredSize(new Dimension(170, 35));
+        btn.setMaximumSize(new Dimension(170, 35));
+        
+        if (rutaIcono != null && !rutaIcono.isEmpty()) {
+            Icon icon = IconUtil.load(rutaIcono, iconSize); 
+            if (icon != null) {
+                btn.setIcon(icon);
+                btn.setIconTextGap(8); 
+            }
+        }
+        return btn;
+    }
+}

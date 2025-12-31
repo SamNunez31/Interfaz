@@ -61,7 +61,7 @@ public class DashboardFrame extends JFrame {
         contentPanel.add(new SimpleModulePanel("Roles de Pago", "Cálculos de nómina..."), "ROLES");
         contentPanel.add(new SimpleModulePanel("Facturación", "Formulario de facturas..."), "FACTURACION");
         contentPanel.add(new SimpleModulePanel("Clientes", "Directorio de clientes..."), "CLIENTES");
-        contentPanel.add(new SimpleModulePanel("Proveedores", "Gestión de proveedores..."), "PROVEEDORES");
+        contentPanel.add(new PanelProveedores(), "PROVEEDORES");        
         contentPanel.add(new SimpleModulePanel("Kardex", "Movimientos de inventario..."), "KARDEX");
         contentPanel.add(new SimpleModulePanel("Balances", "Estado de situación financiera..."), "BALANCES");
 
