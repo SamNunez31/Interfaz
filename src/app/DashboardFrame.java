@@ -5,17 +5,11 @@ import ui.sidebar.Sidebar;
 import javax.swing.*;
 import java.awt.*;
 
-import seguridad.Sesion;
-import modules.tthh.ui.PanelRoles;
-// import modules.tthh.ui.PanelEmpleados;  // ← asegúrate que exista
-// import app.LogoutDialog;
-// import app.LoginFrame;
-
 public class DashboardFrame extends JFrame {
 
     private Sidebar sidebar;
     private JPanel contentPanel;
-    private CardLayout cardLayout;
+    private CardLayout cardLayout; 
 
     public DashboardFrame() {
         setTitle("Dashboard - Contexto Comercial");
@@ -24,60 +18,47 @@ public class DashboardFrame extends JFrame {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
-        // ===============================
-        // 1. SIDEBAR
-        // ===============================
+        // 1. Sidebar
         sidebar = new Sidebar();
-
-        // >>> USO DE SESIÓN <<<
-        Sesion sesion = Sesion.getInstancia();
-        if (sesion != null) {
-            String nombre = sesion.getNombreReal();
-            String rol = sesion.getRolSistema();
-
-            if (nombre == null) nombre = "Usuario";
+        
+        // >>> CORRECCIÓN: USAR DATOS DE LA SESIÓN <<<
+        // Verificamos si hay una sesión activa (debería haberla si venimos del Login)
+        if (seguridad.Sesion.getInstancia() != null) {
+            String nombreReal = seguridad.Sesion.getInstancia().getNombreReal();
+            String rol = seguridad.Sesion.getInstancia().getRolSistema();
+            
+            // Si por alguna razón es nulo (pruebas directas), ponemos un fallback
+            if (nombreReal == null) nombreReal = "Usuario Prueba";
             if (rol == null) rol = "INVITADO";
-
-            sidebar.setUser(nombre, rol);
+            
+            sidebar.setUser(nombreReal, rol); 
         } else {
-            // Fallback si abres Dashboard directamente
+            // Fallback por si ejecutas DashboardFrame directamente sin pasar por Login
             sidebar.setUser("Modo Desarrollo", "DEV");
         }
-
-    sidebar.setMenuListener(new java.util.function.Consumer<String>() {
-    @Override
-    public void accept(String screenName) {
-           showScreen(screenName);
-        }
-    });
-
-
-
+        
+        // Conectamos el listener del menú
+        sidebar.setMenuListener(screenName -> showScreen(screenName));
+        add(sidebar, BorderLayout.WEST);
+        
+        // Conectamos el listener del menú
+        sidebar.setMenuListener(screenName -> showScreen(screenName));
         add(sidebar, BorderLayout.WEST);
 
-        // ===============================
-        // 2. PANEL CENTRAL (CardLayout)
-        // ===============================
+        // 2. Panel Central (CardLayout)
         cardLayout = new CardLayout();
         contentPanel = new JPanel(cardLayout);
         contentPanel.setBackground(Theme.BG);
-
-        // ===============================
-        // 3. DEFINICIÓN DE PANTALLAS
-        // ===============================
-        contentPanel.add(
-                new SimpleModulePanel(
-                        "Bienvenido",
-                        "Selecciona una opción del menú"
-                ),
-                "HOME"
-        );
-
-        // 👉 MÓDULOS REALES
-        contentPanel.add(new PanelEmpleados(), "EMPLEADOS");
-        contentPanel.add(new PanelRoles(), "ROLES");
-
-        // 👉 MÓDULOS TEMPORALES
+        
+        // --- DEFINICIÓN DE PANTALLAS ---
+        
+        contentPanel.add(new SimpleModulePanel("Bienvenido", "Selecciona una opción del menú"), "HOME");
+        
+        // Aquí cargamos tu módulo real de empleados
+        contentPanel.add(new PanelEmpleados(), "EMPLEADOS"); 
+        
+        // Los demás siguen siendo de prueba por ahora...
+        contentPanel.add(new SimpleModulePanel("Roles de Pago", "Cálculos de nómina..."), "ROLES");
         contentPanel.add(new SimpleModulePanel("Facturación", "Formulario de facturas..."), "FACTURACION");
         contentPanel.add(new SimpleModulePanel("Clientes", "Directorio de clientes..."), "CLIENTES");
         contentPanel.add(new SimpleModulePanel("Proveedores", "Gestión de proveedores..."), "PROVEEDORES");
@@ -85,77 +66,63 @@ public class DashboardFrame extends JFrame {
         contentPanel.add(new SimpleModulePanel("Balances", "Estado de situación financiera..."), "BALANCES");
 
         add(contentPanel, BorderLayout.CENTER);
-
+        
         // Mostrar inicio
         cardLayout.show(contentPanel, "HOME");
     }
 
-    // ===============================
-    // CAMBIO DE PANTALLA
-    // ===============================
     private void showScreen(String name) {
-
         if ("LOGOUT".equals(name)) {
-
+            
+            // Usamos el diálogo personalizado
             LogoutDialog dialog = new LogoutDialog(this);
-            dialog.setVisible(true);
-
+            dialog.setVisible(true); 
+            
             if (dialog.isConfirmed()) {
-                dispose();
-                new LoginFrame().setVisible(true);
+                this.dispose(); // Cierra el Dashboard
+                new LoginFrame().setVisible(true); // Abre el Login
             }
-
+            
         } else {
+            // Lógica normal de cambio de pantalla
             cardLayout.show(contentPanel, name);
         }
     }
 
-    // ===============================
-    // PANEL SIMPLE (PLACEHOLDER)
-    // ===============================
+    // Clase auxiliar para pantallas que aún no programas
     class SimpleModulePanel extends JPanel {
-
         public SimpleModulePanel(String title, String description) {
-            setLayout(new GridBagLayout());
-            setBackground(Theme.BG);
-
+            setLayout(new GridBagLayout()); 
+            setBackground(Theme.BG); 
+            
             JPanel card = new JPanel();
             card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-            card.setBackground(new Color(40, 40, 45));
+            card.setBackground(new Color(40, 40, 45)); 
             card.setBorder(BorderFactory.createEmptyBorder(30, 50, 30, 50));
-
+            
             JLabel lblTitle = new JLabel(title);
             lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 28));
-            lblTitle.setForeground(Theme.ACCENT);
+            lblTitle.setForeground(Theme.ACCENT); 
             lblTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
-
+            
             JLabel lblDesc = new JLabel(description);
             lblDesc.setFont(new Font("Segoe UI", Font.PLAIN, 16));
             lblDesc.setForeground(Theme.TEXT);
             lblDesc.setAlignmentX(Component.CENTER_ALIGNMENT);
-
+            
             card.add(lblTitle);
             card.add(Box.createVerticalStrut(10));
             card.add(lblDesc);
-
+            
             add(card);
         }
     }
 
-    // ===============================
-    // MAIN
-    // ===============================
     public static void main(String[] args) {
-        try {
-            UIManager.setLookAndFeel(new com.formdev.flatlaf.FlatDarkLaf());
-        } catch (Exception ex) {
-        }
-
-        SwingUtilities.invokeLater(new Runnable() {
-            @Override
-            public void run() {
-                new DashboardFrame().setVisible(true);
-            }
+        try { UIManager.setLookAndFeel(new com.formdev.flatlaf.FlatDarkLaf()); } catch (Exception ex) {}
+        
+        SwingUtilities.invokeLater(() -> {
+            new DashboardFrame().setVisible(true);
         });
     }
 }
