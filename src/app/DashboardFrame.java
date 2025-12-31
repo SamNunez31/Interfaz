@@ -21,8 +21,25 @@ public class DashboardFrame extends JFrame {
         // 1. Sidebar
         sidebar = new Sidebar();
         
-        // >>> AQUÍ ESTÁ EL CAMBIO: Asignamos el usuario para que salga en el menú <<<
-        sidebar.setUser("Admin User", "Gerente General"); 
+        // >>> CORRECCIÓN: USAR DATOS DE LA SESIÓN <<<
+        // Verificamos si hay una sesión activa (debería haberla si venimos del Login)
+        if (seguridad.Sesion.getInstancia() != null) {
+            String nombreReal = seguridad.Sesion.getInstancia().getNombreReal();
+            String rol = seguridad.Sesion.getInstancia().getRolSistema();
+            
+            // Si por alguna razón es nulo (pruebas directas), ponemos un fallback
+            if (nombreReal == null) nombreReal = "Usuario Prueba";
+            if (rol == null) rol = "INVITADO";
+            
+            sidebar.setUser(nombreReal, rol); 
+        } else {
+            // Fallback por si ejecutas DashboardFrame directamente sin pasar por Login
+            sidebar.setUser("Modo Desarrollo", "DEV");
+        }
+        
+        // Conectamos el listener del menú
+        sidebar.setMenuListener(screenName -> showScreen(screenName));
+        add(sidebar, BorderLayout.WEST);
         
         // Conectamos el listener del menú
         sidebar.setMenuListener(screenName -> showScreen(screenName));

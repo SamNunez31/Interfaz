@@ -12,7 +12,7 @@ import java.sql.SQLException;
 public class ConexionBD {
     
     // Configuración centralizada
-    private static final String URL = "jdbc:sqlserver://localhost:1433;databaseName=ContextoComercialAcme;encrypt=true;trustServerCertificate=true;";
+    private static final String URL = "jdbc:sqlserver://localhost:1433;databaseName=BD_Comercial;encrypt=true;trustServerCertificate=true;";
     private static final String USUARIO = "SuperAdmin";
     private static final String CLAVE = "root";
 

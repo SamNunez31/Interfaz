@@ -1,5 +1,6 @@
 package app;
 
+import seguridad.UsuarioDAO;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -96,16 +97,41 @@ public class LoginFrame extends JFrame {
     }
 
     private void attemptLogin() {
-        if (txtUser.getText().equals("admin") && new String(txtPass.getPassword()).equals("1234")) {
-             Notifications.getInstance().show(Notifications.Type.SUCCESS, Notifications.Location.TOP_RIGHT, "Bienvenido al Sistema");
+        String usuario = txtUser.getText().trim();
+        // Usamos getPassword() por seguridad
+        String clave = new String(txtPass.getPassword()).trim();
+
+        // Validación básica: Evitar vacíos o placeholders
+        if (usuario.isEmpty() || usuario.equals("Usuario") || 
+            clave.isEmpty() || clave.equals("Contraseña")) {
+            
+            Notifications.getInstance().show(Notifications.Type.WARNING, 
+                    Notifications.Location.TOP_RIGHT, "Por favor ingrese sus credenciales");
+            return;
+        }
+
+        // --- LÓGICA REAL CON BASE DE DATOS ---
+        UsuarioDAO dao = new UsuarioDAO();
+        
+        if (dao.autenticar(usuario, clave)) {
+             // 1. Éxito: Notificación visual
+             Notifications.getInstance().show(Notifications.Type.SUCCESS, 
+                     Notifications.Location.TOP_RIGHT, "Bienvenido al Sistema");
+             
+             // 2. Timer para efecto visual suave
              Timer timer = new Timer(800, e -> {
+                 // 3. Abrir el Dashboard
                  new DashboardFrame().setVisible(true);
+                 // 4. Cerrar Login
                  this.dispose();
              });
              timer.setRepeats(false); 
              timer.start();
+             
         } else {
-             Notifications.getInstance().show(Notifications.Type.ERROR, Notifications.Location.TOP_RIGHT, "Credenciales Inválidas");
+             // Fallo: Usuario no existe o clave incorrecta
+             Notifications.getInstance().show(Notifications.Type.ERROR, 
+                     Notifications.Location.TOP_RIGHT, "Credenciales Inválidas o Usuario Inactivo");
         }
     }
 

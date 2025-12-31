@@ -2,13 +2,17 @@ package app;
 
 import ConexionBD.ConexionBD;
 import raven.toast.Notifications;
-import shared.ui.IconUtil; 
+import shared.ui.IconUtil;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.JTableHeader;
 import java.awt.*;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.RoundRectangle2D;
@@ -16,13 +20,14 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.text.DecimalFormat;
+import javax.swing.text.JTextComponent;
 
 public class PanelEmpleados extends JPanel {
 
     private JTable tabla;
     private DefaultTableModel modelo;
     private JTextField txtBuscar;
-    private JCheckBox chkVerTodos; // <--- AGREGAR ESTO
+    private JCheckBox chkVerTodos; 
 
     // Colores del Tema
     private final Color COLOR_VERDE = new Color(46, 204, 113);
@@ -59,17 +64,15 @@ public class PanelEmpleados extends JPanel {
         toolbar.setLayout(new BoxLayout(toolbar, BoxLayout.X_AXIS)); 
         toolbar.setOpaque(false);
 
-        // BOTÓN NUEVO (Icono 20px)
+        // BOTONES
         JButton btnNuevo = crearBoton("Nuevo Empleado", COLOR_VERDE, "/icono/agregar.png", 20);
         btnNuevo.addActionListener(e -> abrirFormulario(0));
 
-        // BOTÓN ELIMINAR (Icono 16px - Pequeño)
         JButton btnEliminar = crearBoton("Eliminar Empleado", COLOR_ROJO, "/icono/borrar.png", 16);
         btnEliminar.addActionListener(e -> eliminarEmpleado());
         
-        // >>> BOTÓN ACTUALIZAR (Icono 26px - Grande) <<<
         JButton btnEditar = crearBoton("Actualizar Empleado", new Color(100, 100, 100), "/icono/editar.png", 26);
-        btnEditar.setPreferredSize(new Dimension(200, 35)); // Ancho suficiente para el texto
+        btnEditar.setPreferredSize(new Dimension(200, 35)); 
         btnEditar.setMaximumSize(new Dimension(200, 35));
         btnEditar.addActionListener(e -> editarEmpleadoSeleccionado()); 
 
@@ -77,13 +80,18 @@ public class PanelEmpleados extends JPanel {
         JPanel panelBuscador = new JPanel(new BorderLayout());
         panelBuscador.setOpaque(false);
         panelBuscador.setBorder(BorderFactory.createLineBorder(new Color(60, 60, 65), 1)); 
-        panelBuscador.setMaximumSize(new Dimension(300, 35)); 
-        panelBuscador.setPreferredSize(new Dimension(250, 35));
+        panelBuscador.setMaximumSize(new Dimension(350, 35)); 
+        panelBuscador.setPreferredSize(new Dimension(300, 35));
 
         txtBuscar = new JTextField(15);
-        txtBuscar.putClientProperty("JTextField.placeholderText", "Buscar...");
-        txtBuscar.putClientProperty("JTextField.showClearButton", true);
         txtBuscar.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 5));
+        
+        TextPrompt placeholder = new TextPrompt("Ingrese cédula, nombre o apellido...", txtBuscar);
+        placeholder.changeAlpha(0.6f); 
+        placeholder.changeStyle(Font.ITALIC); 
+        
+        txtBuscar.putClientProperty("JTextField.placeholderText", "Ingrese cédula, nombre o apellido...");
+        txtBuscar.putClientProperty("JTextField.showClearButton", true);
         
         Icon iconoBuscar = IconUtil.load("/icono/buscar.png", 20); 
         JButton btnBuscar = new JButton();
@@ -116,57 +124,53 @@ public class PanelEmpleados extends JPanel {
         return panel;
     }
 
- private JPanel crearPanelTabla() {
-    JPanel panel = new JPanel(new BorderLayout());
-    panel.setOpaque(false);
-    // Reduje el padding inferior de 20 a 5 para que el checkbox quede más pegadito
-    panel.setBorder(BorderFactory.createEmptyBorder(10, 20, 5, 20));
+    private JPanel crearPanelTabla() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setOpaque(false);
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 20, 5, 20));
 
-    modelo = new DefaultTableModel(
-        new Object[]{"ID", "Cédula", "Apellidos", "Nombres", "Departamento", "Rol", "Sueldo ($)", "Estado"}, 0
-    ) {
-        @Override
-        public boolean isCellEditable(int row, int column) { return false; }
-    };
+        modelo = new DefaultTableModel(
+            new Object[]{"ID", "Cédula", "Apellidos", "Nombres", "Departamento", "Rol", "Sueldo ($)", "Estado"}, 0
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int column) { return false; }
+        };
 
-    tabla = new JTable(modelo);
-    configurarTabla();
+        tabla = new JTable(modelo);
+        configurarTabla();
 
-    tabla.addMouseListener(new MouseAdapter() {
-        public void mouseClicked(MouseEvent e) {
-            if (e.getClickCount() == 2) {
-                editarEmpleadoSeleccionado();
+        tabla.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    editarEmpleadoSeleccionado();
+                }
             }
-        }
-    });
+        });
 
-    JScrollPane scroll = new JScrollPane(tabla);
-    scroll.setBorder(BorderFactory.createEmptyBorder());
-    scroll.getViewport().setBackground(Color.WHITE);
-    // Opcional: Forzar una altura preferida si quieres que sea más pequeña visualmente
-    scroll.setPreferredSize(new Dimension(scroll.getPreferredSize().width, 350));
+        JScrollPane scroll = new JScrollPane(tabla);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.getViewport().setBackground(Color.WHITE);
+        scroll.setPreferredSize(new Dimension(scroll.getPreferredSize().width, 350));
 
-    panel.add(scroll, BorderLayout.CENTER);
+        panel.add(scroll, BorderLayout.CENTER);
 
-    // --- NUEVO: PANEL INFERIOR (FOOTER) CON EL CHECKBOX ---
-    JPanel panelFooter = new JPanel(new FlowLayout(FlowLayout.LEFT));
-    panelFooter.setOpaque(false);
-    panelFooter.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
+        JPanel panelFooter = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        panelFooter.setOpaque(false);
+        panelFooter.setBorder(BorderFactory.createEmptyBorder(5, 0, 0, 0));
 
-    chkVerTodos = new JCheckBox("Ver todos");
-    chkVerTodos.setFont(new Font("Segoe UI", Font.PLAIN, 13));
-    chkVerTodos.setForeground(Color.WHITE); // Texto blanco para contraste
-    chkVerTodos.setOpaque(false);
-    chkVerTodos.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        chkVerTodos = new JCheckBox("Ver todos");
+        chkVerTodos.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+        chkVerTodos.setForeground(Color.WHITE); 
+        chkVerTodos.setOpaque(false);
+        chkVerTodos.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-    // ACCIÓN: Al dar click, recargamos la tabla con el filtro actual del buscador
-    chkVerTodos.addActionListener(e -> cargarEmpleados(txtBuscar.getText().trim()));
+        chkVerTodos.addActionListener(e -> cargarEmpleados(txtBuscar.getText().trim()));
 
-    panelFooter.add(chkVerTodos);
-    panel.add(panelFooter, BorderLayout.SOUTH); // Lo ponemos al sur para que salga debajo de la tabla
+        panelFooter.add(chkVerTodos);
+        panel.add(panelFooter, BorderLayout.SOUTH); 
 
-    return panel;
-}
+        return panel;
+    }
 
     private void configurarTabla() {
         tabla.setRowHeight(40); 
@@ -176,7 +180,7 @@ public class PanelEmpleados extends JPanel {
         
         tabla.setBackground(TABLA_FONDO); 
         tabla.setForeground(TABLA_TEXTO); 
-        tabla.setGridColor(TABLA_GRID);   
+        tabla.setGridColor(TABLA_GRID);    
         
         tabla.setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
 
@@ -192,37 +196,43 @@ public class PanelEmpleados extends JPanel {
                 setForeground(TABLA_TEXTO);
                 setFont(new Font("Segoe UI", Font.BOLD, 14));
                 setHorizontalAlignment(JLabel.CENTER);
-                setBorder(BorderFactory.createMatteBorder(0, 0, 2, 0, new Color(200,200,200)));
+                
+                // --- CAMBIO CLAVE AQUÍ: Se agrega el borde derecho (1) para marcar las separaciones ---
+                setBorder(BorderFactory.createMatteBorder(0, 0, 2, 1, new Color(200,200,200)));
+                
                 return this;
             }
         });
 
+        // Configuración de anchos
         tabla.getColumnModel().getColumn(0).setPreferredWidth(40);
         tabla.getColumnModel().getColumn(0).setMaxWidth(60);
-        
         tabla.getColumnModel().getColumn(1).setPreferredWidth(100);
         tabla.getColumnModel().getColumn(1).setMinWidth(90);
-        
         tabla.getColumnModel().getColumn(2).setPreferredWidth(200); 
         tabla.getColumnModel().getColumn(2).setMinWidth(150);
-        
         tabla.getColumnModel().getColumn(3).setPreferredWidth(200);
         tabla.getColumnModel().getColumn(3).setMinWidth(150);
-        
         tabla.getColumnModel().getColumn(4).setPreferredWidth(150);
         tabla.getColumnModel().getColumn(4).setMinWidth(100);
-        
         tabla.getColumnModel().getColumn(5).setPreferredWidth(130);
         tabla.getColumnModel().getColumn(5).setMinWidth(100);
-        
         tabla.getColumnModel().getColumn(6).setPreferredWidth(100);
         tabla.getColumnModel().getColumn(6).setMaxWidth(120);
-        
         tabla.getColumnModel().getColumn(7).setPreferredWidth(90);
         tabla.getColumnModel().getColumn(7).setMaxWidth(110);
 
-        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer();
-        centerRenderer.setHorizontalAlignment(JLabel.CENTER);
+        DefaultTableCellRenderer centerRenderer = new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
+                super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
+                setHorizontalAlignment(JLabel.CENTER);
+                if (value != null && value.toString().equals("-1")) {
+                    setText("");
+                }
+                return this;
+            }
+        };
         tabla.getColumnModel().getColumn(0).setCellRenderer(centerRenderer); 
         tabla.getColumnModel().getColumn(1).setCellRenderer(centerRenderer);
 
@@ -236,14 +246,20 @@ public class PanelEmpleados extends JPanel {
                 JLabel l = (JLabel) super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
                 l.setFont(new Font("Segoe UI", Font.BOLD, 12));
                 l.setHorizontalAlignment(JLabel.CENTER);
+                l.setIcon(null); 
+                
                 if ("ACT".equals(value)) {
                     l.setForeground(new Color(39, 174, 96)); 
                     l.setText("● ACTIVO");
+                } else if ("NODATA".equals(value)) { 
+                    l.setText("");
+                    l.setForeground(TABLA_TEXTO);
                 } else {
                     l.setForeground(COLOR_ROJO);
                     l.setText("● INACTIVO");
                 }
-                if (isSelected) {
+                
+                if (isSelected && !"NODATA".equals(value)) {
                     l.setForeground(Color.WHITE); 
                     l.setBackground(new Color(124, 77, 255)); 
                 } else {
@@ -257,112 +273,95 @@ public class PanelEmpleados extends JPanel {
         tabla.setSelectionForeground(Color.WHITE);
     }
 
- private void cargarEmpleados(String filtro) {
-    modelo.setRowCount(0);
+    private void cargarEmpleados(String filtro) {
+        modelo.setRowCount(0);
 
-    // 1. Base de la consulta
-    String sql = "SELECT e.id_Empleado_PK, e.emp_ciruc, e.emp_Apellido1, e.emp_Nombre1, " +
-                 "d.dep_Nombre, r.rol_Descripcion, e.emp_Sueldo, e.emp_Estado, " +
-                 "e.emp_Apellido2, e.emp_Nombre2 " +
-                 "FROM Empleados e " +
-                 "JOIN Departamentos d ON e.id_Departamento = d.id_Departamento_PK " +
-                 "JOIN Roles r ON e.id_Rol = r.id_Rol_PK " +
-                 "WHERE 1=1 "; // Usamos 1=1 para concatenar condiciones fácilmente
+        String sql = "SELECT e.id_Empleado_PK, e.emp_ciruc, e.emp_Apellido1, e.emp_Nombre1, " +
+                     "d.dep_Nombre, r.rol_Descripcion, e.emp_Sueldo, e.emp_Estado, " +
+                     "e.emp_Apellido2, e.emp_Nombre2 " +
+                     "FROM Empleados e " +
+                     "JOIN Departamentos d ON e.id_Departamento = d.id_Departamento_PK " +
+                     "JOIN Roles r ON e.id_Rol = r.id_Rol_PK " +
+                     "WHERE 1=1 "; 
 
-    // 2. Lógica del CheckBox: Si NO está seleccionado, filtra solo activos
-    // (Si está seleccionado, no agrega nada, por lo tanto trae todo)
-    if (chkVerTodos != null && !chkVerTodos.isSelected()) {
-        sql += " AND e.emp_Estado = 'ACT' ";
-    }
-
-    // 3. Filtro del buscador
-    if (!filtro.isEmpty()) {
-        sql += " AND (e.emp_ciruc LIKE ? OR e.emp_Apellido1 LIKE ? OR e.emp_Nombre1 LIKE ?) ";
-    }
-
-    sql += " ORDER BY e.emp_Apellido1 ASC";
-
-    try (Connection cn = ConexionBD.getConexion();
-         PreparedStatement pst = cn.prepareStatement(sql)) {
+        if (chkVerTodos != null && !chkVerTodos.isSelected()) {
+            sql += " AND e.emp_Estado = 'ACT' ";
+        }
 
         if (!filtro.isEmpty()) {
-            String f = "%" + filtro + "%";
-            pst.setString(1, f);
-            pst.setString(2, f);
-            pst.setString(3, f);
+            sql += " AND (e.emp_ciruc LIKE ? OR e.emp_Apellido1 LIKE ? OR e.emp_Apellido2 LIKE ? OR e.emp_Nombre1 LIKE ? OR e.emp_Nombre2 LIKE ?) ";
         }
 
-        ResultSet rs = pst.executeQuery();
-        DecimalFormat df = new DecimalFormat("#,##0.00");
+        sql += " ORDER BY e.emp_Apellido1 ASC";
 
-        while (rs.next()) {
-            // Construcción de Nombres y Apellidos
-            String apellidos = "";
-            if (rs.getString("emp_Apellido1") != null) apellidos += rs.getString("emp_Apellido1").trim();
-            if (rs.getString("emp_Apellido2") != null && !rs.getString("emp_Apellido2").trim().isEmpty()) {
-                apellidos += " " + rs.getString("emp_Apellido2").trim();
+        try (Connection cn = ConexionBD.getConexion();
+             PreparedStatement pst = cn.prepareStatement(sql)) {
+
+            if (!filtro.isEmpty()) {
+                String f = "%" + filtro + "%";
+                pst.setString(1, f); pst.setString(2, f); pst.setString(3, f); pst.setString(4, f); pst.setString(5, f);
             }
 
-            String nombres = "";
-            if (rs.getString("emp_Nombre1") != null) nombres += rs.getString("emp_Nombre1").trim();
-            if (rs.getString("emp_Nombre2") != null && !rs.getString("emp_Nombre2").trim().isEmpty()) {
-                nombres += " " + rs.getString("emp_Nombre2").trim();
+            ResultSet rs = pst.executeQuery();
+            DecimalFormat df = new DecimalFormat("#,##0.00");
+            boolean hayDatos = false;
+
+            while (rs.next()) {
+                hayDatos = true;
+                String apellidos = "";
+                if (rs.getString("emp_Apellido1") != null) apellidos += rs.getString("emp_Apellido1").trim();
+                if (rs.getString("emp_Apellido2") != null && !rs.getString("emp_Apellido2").trim().isEmpty()) {
+                    apellidos += " " + rs.getString("emp_Apellido2").trim();
+                }
+                String nombres = "";
+                if (rs.getString("emp_Nombre1") != null) nombres += rs.getString("emp_Nombre1").trim();
+                if (rs.getString("emp_Nombre2") != null && !rs.getString("emp_Nombre2").trim().isEmpty()) {
+                    nombres += " " + rs.getString("emp_Nombre2").trim();
+                }
+
+                modelo.addRow(new Object[]{
+                    rs.getInt("id_Empleado_PK"), 
+                    rs.getString("emp_ciruc"),
+                    apellidos, 
+                    nombres,   
+                    rs.getString("dep_Nombre"),
+                    rs.getString("rol_Descripcion"),
+                    df.format(rs.getDouble("emp_Sueldo")),
+                    rs.getString("emp_Estado")              
+                });
             }
 
-            // NOTA: Tu renderizador de la columna 7 (Estado) ya tiene la lógica:
-            // if ("ACT".equals(value)) -> Verde
-            // else -> Rojo e "INACTIVO"
-            // Por lo tanto, al llegar un estado 'INA', se pintará rojo automáticamente.
+            if (!hayDatos) {
+                modelo.addRow(new Object[]{-1, "", "No se han encontrado resultados", "", "", "", "", "NODATA"});
+            }
 
-            modelo.addRow(new Object[]{
-                rs.getInt("id_Empleado_PK"),
-                rs.getString("emp_ciruc"),
-                apellidos,
-                nombres,
-                rs.getString("dep_Nombre"),
-                rs.getString("rol_Descripcion"),
-                df.format(rs.getDouble("emp_Sueldo")),
-                rs.getString("emp_Estado") // Pasamos el estado crudo (ACT/INA)
-            });
+        } catch (Exception e) {
+            e.printStackTrace();
+            Notifications.getInstance().show(Notifications.Type.ERROR, Notifications.Location.TOP_RIGHT, "Error al cargar datos");
         }
-    } catch (Exception e) {
-        e.printStackTrace();
-        Notifications.getInstance().show(Notifications.Type.ERROR, Notifications.Location.TOP_RIGHT, "Error al cargar datos");
     }
-}
 
-private void editarEmpleadoSeleccionado() {
+    private void editarEmpleadoSeleccionado() {
         int fila = tabla.getSelectedRow();
         if (fila == -1) {
             Notifications.getInstance().show(Notifications.Type.WARNING, Notifications.Location.TOP_RIGHT, "Seleccione un empleado para ver");
             return;
         }
 
-        // 1. Obtener ID y Estado
         int id = Integer.parseInt(tabla.getValueAt(fila, 0).toString());
-        Object valorEstado = tabla.getValueAt(fila, 7); // Columna 7 es el estado
+        Object valorEstado = tabla.getValueAt(fila, 7); 
         String estado = (valorEstado != null) ? valorEstado.toString() : "";
         
-        // 2. Crear el diálogo (pero NO mostrarlo todavía con setVisible)
         Window ventanaPadre = SwingUtilities.getWindowAncestor(this);
         DialogoEmpleado dialogo = new DialogoEmpleado((Frame) ventanaPadre, id);
 
-        // 3. Verificar si es inactivo
-        // Aceptamos "INA" (dato crudo) o "INACTIVO" (por si acaso cambias el renderer)
         if ("INA".equals(estado) || estado.contains("INACTIVO")) {
-            
-            // Avisamos sutilmente al usuario
             Notifications.getInstance().show(Notifications.Type.INFO, Notifications.Location.TOP_RIGHT, "Modo Lectura: Empleado Inactivo");
-            
-            // >>> AQUÍ LLAMAMOS AL MÉTODO QUE BLOQUEA LA EDICIÓN <<<
-            // (Debes crear este método en tu clase DialogoEmpleado, ver abajo)
             dialogo.activarModoSoloLectura(); 
         }
 
-        // 4. Mostrar el diálogo
         dialogo.setVisible(true); 
         
-        // 5. Recargar tabla solo si hubo cambios (si estaba en modo lectura, esto no pasará, pero no estorba)
         if (dialogo.isOperacionExitosa()) {
             cargarEmpleados(""); 
         }
@@ -375,6 +374,14 @@ private void editarEmpleadoSeleccionado() {
             return;
         }
 
+        Object valorEstado = tabla.getValueAt(fila, 7);
+        String estado = (valorEstado != null) ? valorEstado.toString() : "";
+
+        if ("INA".equals(estado) || estado.contains("INACTIVO")) {
+            Notifications.getInstance().show(Notifications.Type.INFO, Notifications.Location.TOP_RIGHT, "El empleado ya se encuentra inactivo");
+            return; 
+        }
+
         int id = Integer.parseInt(tabla.getValueAt(fila, 0).toString());
         String nombre = tabla.getValueAt(fila, 3).toString() + " " + tabla.getValueAt(fila, 2).toString();
 
@@ -383,8 +390,8 @@ private void editarEmpleadoSeleccionado() {
                  PreparedStatement pst = cn.prepareStatement("UPDATE Empleados SET emp_Estado = 'INA' WHERE id_Empleado_PK = ?")) {
                 pst.setInt(1, id);
                 if (pst.executeUpdate() > 0) {
-                    Notifications.getInstance().show(Notifications.Type.SUCCESS, Notifications.Location.TOP_RIGHT, "Empleado eliminado");
-                    cargarEmpleados("");
+                    Notifications.getInstance().show(Notifications.Type.SUCCESS, Notifications.Location.TOP_RIGHT, "Empleado eliminado (Inactivo)");
+                    cargarEmpleados(txtBuscar.getText().trim());
                 }
             } catch (Exception e) {
                 Notifications.getInstance().show(Notifications.Type.ERROR, Notifications.Location.TOP_RIGHT, "Error al eliminar");
@@ -471,7 +478,6 @@ private void editarEmpleadoSeleccionado() {
         }
     }
 
-    // >>> MÉTODO MODIFICADO: Acepta tamaño de icono <<<
     private JButton crearBoton(String texto, Color bg, String rutaIcono, int iconSize) {
         JButton btn = new JButton(texto);
         btn.setBackground(bg);
@@ -480,17 +486,73 @@ private void editarEmpleadoSeleccionado() {
         btn.setBorderPainted(false);
         btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        // Tamaño por defecto 170, excepto si se sobreescribe externamente
         btn.setPreferredSize(new Dimension(170, 35));
         btn.setMaximumSize(new Dimension(170, 35));
         
         if (rutaIcono != null && !rutaIcono.isEmpty()) {
-            Icon icon = IconUtil.load(rutaIcono, iconSize); // Usa el tamaño pasado por parámetro
+            Icon icon = IconUtil.load(rutaIcono, iconSize); 
             if (icon != null) {
                 btn.setIcon(icon);
                 btn.setIconTextGap(8); 
             }
         }
         return btn;
+    }
+
+    class TextPrompt extends JLabel implements FocusListener, DocumentListener {
+        JTextComponent component;
+        DocumentListener documentListener;
+
+        public TextPrompt(String text, JTextComponent component) {
+            this.component = component;
+            setShow(Show.ALWAYS);
+            documentListener = this;
+            setText(text);
+            setFont(component.getFont());
+            setForeground(component.getForeground());
+            setBorder(new EmptyBorder(component.getInsets()));
+            setHorizontalAlignment(JLabel.LEADING);
+
+            component.addFocusListener(this);
+            component.getDocument().addDocumentListener(this);
+            component.setLayout(new BorderLayout());
+            component.add(this);
+            checkForPrompt();
+        }
+
+        public void changeAlpha(float alpha) {
+            changeAlpha((int) (alpha * 255));
+        }
+
+        public void changeAlpha(int alpha) {
+            alpha = alpha > 255 ? 255 : alpha < 0 ? 0 : alpha;
+            setForeground(new Color(getForeground().getRed(), getForeground().getGreen(), getForeground().getBlue(), alpha));
+        }
+
+        public void changeStyle(int style) {
+            setFont(getFont().deriveFont(style));
+        }
+
+        public void checkForPrompt() {
+            if (component.getText().length() > 0) {
+                setVisible(false);
+                return;
+            }
+            if (show == Show.ALWAYS || (show == Show.FOCUS_LOST && !component.hasFocus()) || (show == Show.FOCUS_GAINED && component.hasFocus())) {
+                setVisible(true);
+            } else {
+                setVisible(false);
+            }
+        }
+
+        public void focusGained(FocusEvent e) { checkForPrompt(); }
+        public void focusLost(FocusEvent e) { checkForPrompt(); }
+        public void insertUpdate(DocumentEvent e) { checkForPrompt(); }
+        public void removeUpdate(DocumentEvent e) { checkForPrompt(); }
+        public void changedUpdate(DocumentEvent e) {}
+
+        private Show show;
+        public void setShow(Show show) { this.show = show; }
+        public enum Show { ALWAYS, FOCUS_GAINED, FOCUS_LOST; }
     }
 }
